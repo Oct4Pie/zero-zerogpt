@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/zero-zerogpt/static/css/main.e6c13ad2.css",
+    "main.js": "/zero-zerogpt/static/js/main.8e6411c0.js",
+    "index.html": "/zero-zerogpt/index.html",
+    "main.e6c13ad2.css.map": "/zero-zerogpt/static/css/main.e6c13ad2.css.map",
+    "main.8e6411c0.js.map": "/zero-zerogpt/static/js/main.8e6411c0.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e6c13ad2.css",
+    "static/js/main.8e6411c0.js"
+  ]
+}
