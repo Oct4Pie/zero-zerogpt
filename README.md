@@ -40,7 +40,7 @@ This project **does not promote plagiarism or the misuse of AI technology**. It 
 ## Run Locally
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/zero-zerogpt.git
+   git clone https://github.com/oct4pie/zero-zerogpt.git
    cd zero-zerogpt
    ```
 
