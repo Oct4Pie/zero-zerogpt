@@ -493,3 +493,84 @@
     background: #888888;
   }
 }
+
+/* PDF Uploader Styles */
+.pdf-uploader {
+  transition: all 0.3s ease;
+}
+
+.pdf-uploader-dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pdf-uploader-dropzone:hover,
+.pdf-uploader-dropzone.dragging {
+  border-color: #2196f3;
+  background-color: rgba(33, 150, 243, 0.05);
+}
+
+.pdf-uploader-dropzone.error {
+  border-color: #f44336;
+  background-color: rgba(244, 67, 54, 0.05);
+}
+
+.pdf-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.pdf-preview {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* PDF Download button animation */
+.download-btn {
+  transition: transform 0.2s ease;
+}
+
+.download-btn:hover {
+  transform: scale(1.1);
+}
+
+.download-btn:active {
+  transform: scale(0.95);
+}
+
+/* Dark mode PDF styles */
+@media (prefers-color-scheme: dark) {
+  .pdf-uploader-dropzone {
+    border-color: #555;
+  }
+  
+  .pdf-uploader-dropzone:hover,
+  .pdf-uploader-dropzone.dragging {
+    border-color: #90caf9;
+    background-color: rgba(144, 202, 249, 0.08);
+  }
+  
+  .pdf-file-info {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .pdf-preview {
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+}

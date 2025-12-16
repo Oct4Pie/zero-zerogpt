@@ -9,6 +9,7 @@
 - [Live Demo](#live-demo)
 - [AI Detection Approach](#ai-detection-approach)
 - [Unicode Spacing Technique](#unicode-spacing-technique)
+- [PDF Support](#pdf-support)
 - [Examples](#examples)
 - [Installation and Usage](#installation-and-usage)
 - [Contributing](#contributing)
@@ -19,9 +20,11 @@
 
 Zero-ZeroGPT is a demonstration application that showcases how replacing standard spaces with various Unicode space characters can affect the detection of AI-generated text by common AI detection tools like **GPTZero** and **ZeroGPT**. This project looks to explore the limitations of current AI detection methods and promote discussion about more robust processing techniques.
 
+> **Note:** This version is a fork of the original project. It has been enhanced by **MasuRii** to include full **PDF document support**, whereas the original application only supported plain and rich text.
+
 ## Live Demo
 
-Experience Zero-ZeroGPT in action: [https://oct4pie.github.io/zero-zerogpt](https://oct4pie.github.io/zero-zerogpt)
+Experience Zero-ZeroGPT in action (deployed via GitHub Pages): [https://oct4pie.github.io/zero-zerogpt](https://oct4pie.github.io/zero-zerogpt)
 
 ## AI Detection Approach
 
@@ -38,6 +41,33 @@ AI detection tools generally tokenize text based on standard spaces. By replacin
 1. **Tokenization Disruption**: Many detection models split text into tokens based on spaces. When Unicode spaces are used, these tools fail to recognize them as standard spaces.
 2. **Statistical Alteration**: The statistical features of the text are changed when spaces are replaced with Unicode spaces, preventing the model from matching the text with its learned patterns.
 3. **Pattern Interference**: Unicode spaces can disrupt the detection model's ability to identify typical text patterns.
+
+## PDF Support
+
+Developed by **MasuRii**, this fork introduces robust PDF capabilities to Zero-ZeroGPT. While the original tool was limited to text and rich text inputs, this version allows for full document processing.
+
+Zero-ZeroGPT includes comprehensive PDF processing capabilities, powered by **pdfjs-dist** for extraction and **pdf-lib** for high-fidelity generation.
+
+**Features:**
+*   **Layout Preservation**: Maintains the original document's structure, including text positioning, columns, and page dimensions.
+*   **Font Awareness**: Intelligently maps original fonts to standard PDF fonts or compatible fallbacks to preserve the document's visual style.
+*   **Seamless Transformation**: Apply any Unicode spacing pattern to the text while keeping the document layout intact.
+*   **Custom Font Embedding**: Includes high-quality Noto Sans embedding for full Unicode support (including special spaces).
+*   **Column Detection**: Automatically detects and preserves multi-column layouts (2-4 columns) commonly found in research papers and articles.
+*   **Color Preservation**: Accurately extracts and reproduces text colors from the original document using advanced operator list parsing.
+*   **Hybrid Generation**:
+    *   **Layout Preserved Mode**: Generates a PDF that mirrors the input (default).
+    *   **Simple Text Mode**: Generates a clean, simple text document (fallback).
+
+**Testing:**
+The PDF feature suite is backed by a comprehensive testing strategy with **217 tests** covering all utility functions. To run tests:
+```bash
+npm test
+```
+
+**Limitations:**
+*   **Text-Based Only**: The feature supports text-based PDFs. Scanned documents or image-only PDFs are not supported (OCR is not implemented).
+*   **Font Subsetting**: While font families and styles are preserved, exact custom font files are not re-embedded to avoid copyright and size issues; high-quality standard fallbacks are used instead.
 
 ## Examples
 
@@ -79,10 +109,15 @@ Here are some visual examples demonstrating the effect of Unicode spacing on AI 
 
 ### Usage Instructions
 
-1. Enter your text in the input field.
-2. Experiment with different Unicode spaces using the predefined options or create your own combination.
-3. Copy the modified text and test it in various AI detection tools.
-4. Use the "Clear Text" button to reset the input field.
+1. **Select Input Mode**: Choose between "Plain Text", "Rich Text", or "PDF" using the toggle buttons.
+2. **Input Content**:
+   *   **Plain/Rich Text**: Enter or paste your text in the input field.
+   *   **PDF**: Click the "PDF" mode button, then drag & drop a file or click to upload.
+3. **Apply Spacing**: Experiment with different Unicode spaces using the preview cards or create your own combination.
+4. **Export Results**:
+   *   **Copy**: Click the copy icon on any card to copy the modified text.
+   *   **Download (PDF Mode)**: When in PDF mode, click the download icon on any spacing card to generate a new PDF with that specific Unicode spacing applied.
+5.  Use the "Clear Text" button to reset the application and clear any uploaded files.
 
 ## Contributing
 
