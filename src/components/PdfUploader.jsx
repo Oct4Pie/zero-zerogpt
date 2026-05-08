@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   Box,
   Button,
@@ -33,10 +33,10 @@ import { usePdfHandler } from '../hooks/usePdfHandler';
  * @param {Function} props.onError - Callback when an error occurs
  * @param {Object} props.theme - MUI theme object for styling
  */
-const PdfUploader = ({ onTextExtracted, onError, theme }) => {
+const PdfUploader = forwardRef(({ onTextExtracted, onError, theme }, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
-  
+
   const {
     pdfFile,
     pdfText,
@@ -51,46 +51,39 @@ const PdfUploader = ({ onTextExtracted, onError, theme }) => {
     getTextPreview
   } = usePdfHandler();
 
-  /**
-   * Handles file drop event - uses layout-aware extraction
-   */
-  const handleDrop = useCallback(async (e) => {
+  const processFile = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      const extractedData = await extractPdfWithLayout(file);
+      // Build plain text from the extraction for display/transformation.
+      // Direct concatenation (no spaces) matches the character offsets stored
+      // on each text item — used later for layout-preserved rendering.
+      const plainText = extractedData.textItems.map(item => item.text).join('');
+      if (onTextExtracted) {
+        onTextExtracted(plainText, file.name, extractedData.pageCount, extractedData, true);
+      }
+    } catch (err) {
+      if (onError) onError(err);
+    }
+  }, [extractPdfWithLayout, onTextExtracted, onError]);
+
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      clearPdf();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    ingestFile: (file) => processFile(file),
+  }), [clearPdf, processFile]);
+
+  const handleDrop = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-
-    const files = e.dataTransfer?.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
-    try {
-      // Use layout-aware extraction for font and position preservation
-      const extractedData = await extractPdfWithLayout(file);
-      
-      // Build plain text from the extraction for display/transformation
-      // IMPORTANT: Use direct concatenation (no spaces) to match character offsets
-      // The text items already contain any necessary spacing from the PDF
-      const plainText = extractedData.textItems
-        .map(item => item.text)
-        .join('');
-      
-      if (onTextExtracted) {
-        // Pass both plain text and enhanced data with layout info
-        onTextExtracted(
-          plainText,
-          file.name,
-          extractedData.pageCount,
-          extractedData,  // Full enhanced PDF data
-          true            // Layout preserved flag
-        );
-      }
-    } catch (err) {
-      if (onError) {
-        onError(err);
-      }
-    }
-  }, [extractPdfWithLayout, onTextExtracted, onError]);
+    const file = e.dataTransfer?.files?.[0];
+    processFile(file);
+  }, [processFile]);
 
   /**
    * Handles drag over event
@@ -110,47 +103,13 @@ const PdfUploader = ({ onTextExtracted, onError, theme }) => {
     setIsDragging(false);
   }, []);
 
-  /**
-   * Handles file input change - uses layout-aware extraction
-   */
   const handleFileSelect = useCallback(async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
-    try {
-      // Use layout-aware extraction for font and position preservation
-      const extractedData = await extractPdfWithLayout(file);
-      
-      // Build plain text from the extraction for display/transformation
-      // IMPORTANT: Use direct concatenation (no spaces) to match character offsets
-      // The text items already contain any necessary spacing from the PDF
-      const plainText = extractedData.textItems
-        .map(item => item.text)
-        .join('');
-      
-      if (onTextExtracted) {
-        // Pass both plain text and enhanced data with layout info
-        onTextExtracted(
-          plainText,
-          file.name,
-          extractedData.pageCount,
-          extractedData,  // Full enhanced PDF data
-          true            // Layout preserved flag
-        );
-      }
-    } catch (err) {
-      if (onError) {
-        onError(err);
-      }
-    }
-
-    // Reset file input to allow re-uploading the same file
+    const file = e.target.files?.[0];
+    await processFile(file);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [extractPdfWithLayout, onTextExtracted, onError]);
+  }, [processFile]);
 
   /**
    * Handles click on upload zone
@@ -412,6 +371,6 @@ const PdfUploader = ({ onTextExtracted, onError, theme }) => {
       )}
     </Box>
   );
-};
+});
 
 export default PdfUploader;

@@ -10,8 +10,11 @@ import {
 import fontManager, { mapFontStyle } from '../utils/fontManager';
 import { extractAndMergeColors } from '../utils/colorExtractor';
 
-// Configure PDF.js worker using unpkg CDN with proper HTTPS
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+// Use the worker copied to public/ at build time (see scripts/copy-pdf-worker.js)
+// so the app doesn't depend on a third-party CDN at runtime.
+const WORKER_BASENAME = 'pdf.worker.min.mjs';
+const WORKER_PUBLIC_PATH = `${process.env.PUBLIC_URL || ''}/${WORKER_BASENAME}`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_PUBLIC_PATH;
 
 // Maximum file size allowed (25MB)
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -326,7 +329,6 @@ export const usePdfHandler = () => {
         let colorEnhancedItems = pageTextItems;
         try {
           colorEnhancedItems = await extractAndMergeColors(page, pageTextItems);
-          console.log(`Page ${i}: Enhanced ${colorEnhancedItems.length} text items with color data`);
         } catch (colorErr) {
           console.warn(`Page ${i}: Color extraction failed, using default colors:`, colorErr.message);
           // Keep pageTextItems with default black colors

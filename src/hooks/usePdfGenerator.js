@@ -313,44 +313,33 @@ export const usePdfGenerator = () => {
     // Always ensure NotoSans is included as the primary font
     requiredFonts.add('NotoSans');
     
-    console.log('Attempting to load fonts for Unicode support:', [...requiredFonts]);
-    
-    // Load all required fonts
     let primaryUnicodeFont = null;
     const loadedFonts = [];
-    
+
     for (const fontFamily of requiredFonts) {
       try {
         const font = await tryEmbedCustomFont(fontFamily, 'regular');
         if (font) {
           loadedFonts.push({ family: fontFamily, font });
-          
-          // Set NotoSans as primary if loaded
           if (!primaryUnicodeFont && fontFamily === 'NotoSans') {
             primaryUnicodeFont = font;
             hasUnicodeSupport = true;
-            console.log(`Successfully embedded ${fontFamily} for Unicode support`);
           }
         }
       } catch (err) {
         console.warn(`Failed to embed ${fontFamily}:`, err.message);
       }
     }
-    
-    // If primary NotoSans failed, try to use any loaded font as fallback
+
     if (!primaryUnicodeFont && loadedFonts.length > 0) {
       primaryUnicodeFont = loadedFonts[0].font;
       hasUnicodeSupport = true;
-      console.log('Using fallback font for Unicode support');
     }
-    
-    // Set default font - prefer Unicode font if available
+
     if (primaryUnicodeFont) {
       embeddedFonts.set('__default__', primaryUnicodeFont);
       embeddedFonts.set('__unicode__', primaryUnicodeFont);
     } else {
-      // Fallback to Helvetica
-      console.log('Custom fonts not available, using StandardFonts (limited Unicode)');
       const defaultFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
       embeddedFonts.set('__default__', defaultFont);
     }
@@ -460,20 +449,10 @@ export const usePdfGenerator = () => {
       let embeddedFonts, hasUnicodeSupport;
       
       if (useCustomFonts) {
-        console.log('PDF generation: Attempting to use custom fonts for Unicode support...');
-        // Pass the transformed text to analyze which fonts are needed
         const embedResult = await embedStandardFonts(pdfDoc, extractedPdfData.fonts, transformedText);
         embeddedFonts = embedResult.fonts;
         hasUnicodeSupport = embedResult.hasUnicodeSupport;
-        
-        if (hasUnicodeSupport) {
-          console.log('PDF generation: Using Noto Sans for full Unicode character support');
-        } else {
-          console.log('PDF generation: Using StandardFonts (Unicode will be sanitized)');
-        }
       } else {
-        // Skip custom font loading, use StandardFonts directly
-        console.log('PDF generation: Custom fonts disabled, using StandardFonts');
         embeddedFonts = new Map();
         const defaultFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
         embeddedFonts.set('__default__', defaultFont);
@@ -626,14 +605,6 @@ export const usePdfGenerator = () => {
                   currentY -= lineHeightPx;
                 }
                 
-                // Log overflow warning for debugging
-                if (layoutResult.overflow) {
-                  console.log(`Text overflow handled with strategy: ${layoutResult.strategy}`, {
-                    originalText: textToRender.substring(0, 50),
-                    lines: layoutResult.lines.length,
-                    fontSize: layoutResult.fontSize
-                  });
-                }
               }
             } catch (itemErr) {
               console.warn(`Failed to render text item: ${itemErr.message}`);
@@ -720,7 +691,6 @@ export const usePdfGenerator = () => {
       
       // Attempt fallback to simple text-only PDF using pdf-lib
       try {
-        console.log('Falling back to simple text PDF generation');
         const fallbackDoc = await PDFDocument.create();
         const page = fallbackDoc.addPage();
         const { height } = page.getSize();

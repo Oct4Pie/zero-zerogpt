@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   Box,
   Button,
@@ -30,10 +30,10 @@ import { useMarkdownHandler } from '../hooks/useMarkdownHandler';
  * @param {string} [props.className=''] - Optional additional CSS classes
  * @param {Object} props.theme - MUI theme object for styling
  */
-const MarkdownUploader = ({ onTextExtracted, disabled = false, className = '', theme }) => {
+const MarkdownUploader = forwardRef(({ onTextExtracted, disabled = false, className = '', theme }, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
-  
+
   const {
     markdownFile,
     markdownText,
@@ -46,32 +46,35 @@ const MarkdownUploader = ({ onTextExtracted, disabled = false, className = '', t
     getFormattedFileSize
   } = useMarkdownHandler();
 
-  /**
-   * Handles file drop event
-   */
-  const handleDrop = useCallback(async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (disabled) return;
-
-    const files = e.dataTransfer?.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
+  const processFile = useCallback(async (file) => {
+    if (!file || disabled) return;
     try {
       const extractedText = await handleMarkdownUpload(file);
-      
       if (onTextExtracted && extractedText) {
         onTextExtracted(extractedText, file.name);
       }
     } catch (err) {
-      // Error is already handled by the hook and stored in error state
-      console.error('Markdown upload error:', err);
+      // hook already stored err in its error state
     }
   }, [handleMarkdownUpload, onTextExtracted, disabled]);
+
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      clearMarkdown();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    ingestFile: (file) => processFile(file),
+  }), [clearMarkdown, processFile]);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer?.files?.[0];
+    processFile(file);
+  }, [processFile]);
 
   /**
    * Handles drag over event
@@ -93,31 +96,13 @@ const MarkdownUploader = ({ onTextExtracted, disabled = false, className = '', t
     setIsDragging(false);
   }, []);
 
-  /**
-   * Handles file input change
-   */
   const handleFileSelect = useCallback(async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const file = files[0];
-    
-    try {
-      const extractedText = await handleMarkdownUpload(file);
-      
-      if (onTextExtracted && extractedText) {
-        onTextExtracted(extractedText, file.name);
-      }
-    } catch (err) {
-      // Error is already handled by the hook and stored in error state
-      console.error('Markdown upload error:', err);
-    }
-
-    // Reset file input to allow re-uploading the same file
+    const file = e.target.files?.[0];
+    await processFile(file);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [handleMarkdownUpload, onTextExtracted]);
+  }, [processFile]);
 
   /**
    * Handles click on upload zone
@@ -352,6 +337,6 @@ const MarkdownUploader = ({ onTextExtracted, disabled = false, className = '', t
       )}
     </Box>
   );
-};
+});
 
 export default MarkdownUploader;

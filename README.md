@@ -10,6 +10,7 @@
 - [AI Detection Approach](#ai-detection-approach)
 - [Unicode Spacing Technique](#unicode-spacing-technique)
 - [PDF Support](#pdf-support)
+- [Markdown Support](#markdown-support)
 - [Examples](#examples)
 - [Installation and Usage](#installation-and-usage)
 - [Contributing](#contributing)
@@ -69,6 +70,22 @@ npm test
 *   **Text-Based Only**: The feature supports text-based PDFs. Scanned documents or image-only PDFs are not supported (OCR is not implemented).
 *   **Font Subsetting**: While font families and styles are preserved, exact custom font files are not re-embedded to avoid copyright and size issues; high-quality standard fallbacks are used instead.
 
+## Markdown Support
+
+Zero-ZeroGPT also supports uploading and processing Markdown files, allowing you to apply Unicode spacing to existing documents and export the transformed results.
+
+**Features:**
+*   **Drag-and-Drop Upload**: Upload `.md` and `.markdown` files directly into the application.
+*   **AST-Based Transformation**: Uses a Markdown AST to apply Unicode spacing precisely without breaking document structure.
+*   **Structure Preservation**: Retains headings, lists, code blocks, links, images, and other Markdown elements.
+*   **One-Click Export**: Download the transformed Markdown file with your chosen Unicode spacing applied.
+
+**Usage:**
+1. Click the **Markdown** mode button.
+2. Drag and drop a Markdown file or click to select one.
+3. Apply the desired Unicode spacing from the preview cards.
+4. Click the download icon on any card to save the transformed Markdown file.
+
 ## Examples
 
 Here are some visual examples demonstrating the effect of Unicode spacing on AI detection tools:
@@ -109,14 +126,16 @@ Here are some visual examples demonstrating the effect of Unicode spacing on AI 
 
 ### Usage Instructions
 
-1. **Select Input Mode**: Choose between "Plain Text", "Rich Text", or "PDF" using the toggle buttons.
+1. **Select Input Mode**: Choose between "Plain Text", "Rich Text", "PDF", or "Markdown" using the toggle buttons.
 2. **Input Content**:
    *   **Plain/Rich Text**: Enter or paste your text in the input field.
    *   **PDF**: Click the "PDF" mode button, then drag & drop a file or click to upload.
+   *   **Markdown**: Click the "Markdown" mode button, then drag & drop a `.md` file or click to upload.
 3. **Apply Spacing**: Experiment with different Unicode spaces using the preview cards or create your own combination.
 4. **Export Results**:
    *   **Copy**: Click the copy icon on any card to copy the modified text.
    *   **Download (PDF Mode)**: When in PDF mode, click the download icon on any spacing card to generate a new PDF with that specific Unicode spacing applied.
+   *   **Download (Markdown Mode)**: When in Markdown mode, click the download icon on any spacing card to generate a new Markdown file with that specific Unicode spacing applied.
 5.  Use the "Clear Text" button to reset the application and clear any uploaded files.
 
 ## Contributing

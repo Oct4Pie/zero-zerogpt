@@ -348,17 +348,14 @@ export async function extractAndMergeColors(page, textItems) {
     const colorResult = await extractTextColors(page);
     
     if (!colorResult.hasColorData) {
-      // No color data extracted - return items with default black
-      console.log('colorExtractor: No color data found, using default black');
       return textItems.map(item => ({
         ...item,
         color: colorResult.defaultColor,
         colorFromOperatorList: false
       }));
     }
-    
-    console.log(`colorExtractor: Extracted ${colorResult.colorChanges} color changes, ${colorResult.colorMap.size} color positions`);
-    
+
+
     // Merge colors with text items
     return textItems.map(item => {
       const color = matchColorToTextItem(item, colorResult.colorMap, colorResult.defaultColor);

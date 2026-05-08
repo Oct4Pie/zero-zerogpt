@@ -1,19 +1,26 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   TextField, Container, Typography, Box, Grid, AppBar, Toolbar,
   CssBaseline, Button, Card, CardContent, IconButton, Snackbar,
   useMediaQuery, Tooltip, Fade, Select, MenuItem, Chip, ToggleButton, ToggleButtonGroup,
-  CircularProgress
+  CircularProgress, Backdrop, Link
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { FileCopy as FileCopyIcon, Clear as ClearIcon, DarkMode, LightMode, Add as AddIcon, TextFields, FormatColorText, PictureAsPdf, Download as DownloadIcon, Description as MarkdownIcon } from '@mui/icons-material';
+import {
+  FileCopy as FileCopyIcon, Clear as ClearIcon, DarkMode, LightMode, Add as AddIcon,
+  TextFields, FormatColorText, PictureAsPdf, Download as DownloadIcon,
+  DownloadForOffline as DownloadAllIcon, Description as MarkdownIcon, Lock as LockIcon,
+  CloudUpload as CloudUploadIcon
+} from '@mui/icons-material';
 import { FaGithub } from 'react-icons/fa';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import './App.css';
 
+import { unicodeSpaces, usageDescription } from './constants/unicodeSpaces';
+import { usePersistedState } from './hooks/usePersistedState';
+
 // PDF handling imports
-import { usePdfHandler } from './hooks/usePdfHandler';
 import { usePdfGenerator } from './hooks/usePdfGenerator';
 import PdfUploader from './components/PdfUploader';
 
@@ -103,8 +110,7 @@ Font.whitelist = [
   'avant-garde',
   'copperplate',
   'trajan',
-  'optima',
-  
+
   // Monospace Fonts
   'monaco',
   'menlo',
@@ -118,46 +124,18 @@ Font.whitelist = [
 ];
 ReactQuill.Quill.register(Font, true);
 
-const unicodeSpaces = {
-  'Em Space': '\u2003',
-  'En Space': '\u2002',
-  'Thin Space': '\u2009',
-  'Thin Space*2': '\u2009\u2009',
-  'Hair Space': '\u200A',
-  'Narrow, Hair': '\u202F\u200A',
-  'Thin, Hair': ' \u2009\u200A',
-  'Hair Space*3': '\u200A\u200A\u200A',
-  'Narrow No-Break': '\u202F',
-  'Narrow No-Break*2': '\u202F\u202F',
-  'Zero Width Space': '\u200A\u200B\u200A',
-  'Word Joiner': '\u2009\u2060\u2009'
-};
-
-const usageDescription = {
-  'Em Space': 'in wide spacing between characters',
-  'En Space': 'for mid-range spacing',
-  'Thin Space': 'for slightly narrower spacing',
-  'Thin Space*2': 'for even narrower spacing',
-  'Hair Space': 'for very thin spacing',
-  'Narrow, Hair': 'for extra narrow hair-like spacing',
-  'Thin, Hair': 'for a mix of thin and hair spacing',
-  'Hair Space*3': 'for extremely tight spacing',
-  'Narrow No-Break': 'to prevent line breaks with tight spacing',
-  'Narrow No-Break*2': 'for even tighter no-break spacing',
-  'Zero Width Space': 'to create word breaks without visible space',
-  'Word Joiner': 'to prevent word breaks without adding width'
-};
-
 const App = () => {
   const [inputText, setInputText] = useState('');
   const [richText, setRichText] = useState('');
-  const [inputMode, setInputMode] = useState('rich');
+  const [inputMode, setInputMode] = usePersistedState('inputMode', 'rich');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
-  const [mode, setMode] = useState(prefersDarkMode ? 'dark' : 'light');
-  const [customSpaces, setCustomSpaces] = useState([]);
+  const [mode, setMode] = usePersistedState('mode', prefersDarkMode ? 'dark' : 'light');
+  const [customSpaces, setCustomSpaces] = usePersistedState('customSpaces', []);
   const [selectedSpace, setSelectedSpace] = useState('');
+  const [isPageDragging, setIsPageDragging] = useState(false);
+  const [isBatchDownloading, setIsBatchDownloading] = useState(false);
   
   // PDF state
   const [pdfFileName, setPdfFileName] = useState('');
@@ -168,11 +146,11 @@ const App = () => {
   const [markdownFileName, setMarkdownFileName] = useState('');
   const [originalMarkdownText, setOriginalMarkdownText] = useState('');
 
-  // Initialize PDF hooks
-  const {
-    clearPdf
-  } = usePdfHandler();
+  // Uploader refs for cross-component clear
+  const pdfUploaderRef = useRef(null);
+  const markdownUploaderRef = useRef(null);
 
+  // Initialize PDF hooks
   const {
     isGenerating: isPdfGenerating,
     generateAndDownloadPdf,
@@ -275,13 +253,31 @@ const App = () => {
     [mode],
   );
 
+  const invalidateUploadedSources = useCallback(() => {
+    if (pdfFileName || enhancedPdfData) {
+      setPdfFileName('');
+      setEnhancedPdfData(null);
+      setIsLayoutPreserved(false);
+      pdfUploaderRef.current?.clear();
+    }
+    if (markdownFileName || originalMarkdownText) {
+      setMarkdownFileName('');
+      setOriginalMarkdownText('');
+      markdownUploaderRef.current?.clear();
+    }
+  }, [pdfFileName, enhancedPdfData, markdownFileName, originalMarkdownText]);
+
   const handleInputChange = (event) => {
     setInputText(event.target.value);
+    invalidateUploadedSources();
   };
 
   const handleRichTextChange = (content, delta, source, editor) => {
     setRichText(content);
     setInputText(editor.getText());
+    if (source === 'user') {
+      invalidateUploadedSources();
+    }
   };
 
   const handleInputModeChange = (event, newMode) => {
@@ -297,7 +293,7 @@ const App = () => {
   const replaceSpacesInHtml = useCallback((html, unicodeCharacter) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    
+
     const walkTextNodes = (node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         node.textContent = replaceSpaces(node.textContent, unicodeCharacter);
@@ -307,10 +303,54 @@ const App = () => {
         }
       }
     };
-    
+
     walkTextNodes(doc.body);
     return doc.body.innerHTML;
   }, [replaceSpaces]);
+
+  // Memoize each spacing variant once per (input, mode) so we don't run
+  // 12 split/join + DOMParse passes on every render.
+  const transformedTexts = useMemo(() => {
+    const out = {};
+    for (const [key, value] of Object.entries(unicodeSpaces)) {
+      out[key] = replaceSpaces(inputText, value);
+    }
+    return out;
+  }, [inputText, replaceSpaces]);
+
+  const transformedHtml = useMemo(() => {
+    if (inputMode !== 'rich') return {};
+    const out = {};
+    for (const [key, value] of Object.entries(unicodeSpaces)) {
+      out[key] = replaceSpacesInHtml(richText, value);
+    }
+    return out;
+  }, [richText, inputMode, replaceSpacesInHtml]);
+
+  const customSpacingChars = useMemo(
+    () => customSpaces.map((space) => unicodeSpaces[space]).join(''),
+    [customSpaces]
+  );
+
+  const customSpacingText = useMemo(
+    () => replaceSpaces(inputText, customSpacingChars),
+    [inputText, customSpacingChars, replaceSpaces]
+  );
+
+  const customSpacingHtml = useMemo(
+    () => (inputMode === 'rich' ? replaceSpacesInHtml(richText, customSpacingChars) : ''),
+    [richText, inputMode, customSpacingChars, replaceSpacesInHtml]
+  );
+
+  // Word/char counts for whatever the active source is
+  const sourceTextForStats = inputMode === 'rich' ? (richText ? new DOMParser().parseFromString(richText, 'text/html').body.textContent || '' : '') : inputText;
+  const stats = useMemo(() => {
+    const text = sourceTextForStats || '';
+    const chars = text.length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const lines = text ? text.split(/\r?\n/).length : 0;
+    return { chars, words, lines };
+  }, [sourceTextForStats]);
 
   const getUnicodeCode = (text) => {
     return text.split('').map((char) => '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0').toUpperCase()).join('');
@@ -324,7 +364,8 @@ const App = () => {
     setIsLayoutPreserved(false);
     setMarkdownFileName('');
     setOriginalMarkdownText('');
-    clearPdf();
+    pdfUploaderRef.current?.clear();
+    markdownUploaderRef.current?.clear();
   };
 
   // Markdown text extraction callback
@@ -393,7 +434,7 @@ const App = () => {
     
     try {
       // Use layout-preserved generation when enhanced data is available
-      if (isLayoutPreserved && enhancedPdfData &&
+      if (inputMode === 'pdf' && isLayoutPreserved && enhancedPdfData &&
           enhancedPdfData.pageLayouts && enhancedPdfData.pageLayouts.length > 0 &&
           enhancedPdfData.textItems && enhancedPdfData.textItems.length > 0) {
         await generateAndDownloadPdfWithLayout(transformedText, enhancedPdfData, {
@@ -411,7 +452,7 @@ const App = () => {
       setSnackbarMessage(`Error generating PDF: ${err.message}`);
       setSnackbarOpen(true);
     }
-  }, [inputText, pdfFileName, replaceSpaces, generateAndDownloadPdf, generateAndDownloadPdfWithLayout, enhancedPdfData, isLayoutPreserved]);
+  }, [inputText, pdfFileName, inputMode, replaceSpaces, generateAndDownloadPdf, generateAndDownloadPdfWithLayout, enhancedPdfData, isLayoutPreserved]);
 
   const handleCopyText = useCallback((text, key, isHtml = false) => {
     if (isHtml && inputMode === 'rich') {
@@ -451,15 +492,81 @@ const App = () => {
     setCustomSpaces(customSpaces.filter(s => s !== space));
   };
 
-  const getCustomSpacingText = useCallback(() => {
-    const customSpacing = customSpaces.map(space => unicodeSpaces[space]).join('');
-    return replaceSpaces(inputText, customSpacing);
-  }, [customSpaces, inputText, replaceSpaces]);
+  // "Download all variants" — produce one file per defined unicode space.
+  // Sequential to keep memory bounded for large PDFs.
+  const handleDownloadAll = useCallback(async () => {
+    if (inputMode !== 'pdf' && inputMode !== 'markdown') return;
+    if (!inputText && !originalMarkdownText) return;
+    setIsBatchDownloading(true);
+    try {
+      const entries = Object.entries(unicodeSpaces);
+      for (const [key, value] of entries) {
+        if (inputMode === 'pdf') {
+          await handleDownloadPdf(value, key);
+        } else {
+          await handleDownloadMarkdown(value, key);
+        }
+      }
+      setSnackbarMessage(`Downloaded ${entries.length} ${inputMode === 'pdf' ? 'PDFs' : 'Markdown files'}.`);
+      setSnackbarOpen(true);
+    } finally {
+      setIsBatchDownloading(false);
+    }
+  }, [inputMode, inputText, originalMarkdownText, handleDownloadPdf, handleDownloadMarkdown]);
 
-  const getCustomSpacingHtml = useCallback(() => {
-    const customSpacing = customSpaces.map(space => unicodeSpaces[space]).join('');
-    return replaceSpacesInHtml(richText, customSpacing);
-  }, [customSpaces, richText, replaceSpacesInHtml]);
+  // Window-level drag-and-drop: drop a .pdf or .md anywhere on the page to
+  // auto-switch to the right mode and ingest the file.
+  const [pendingIngest, setPendingIngest] = useState(null); // { mode, file } or null
+
+  useEffect(() => {
+    const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+    const onDragOver = (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      setIsPageDragging(true);
+    };
+    const onDragLeave = (e) => {
+      if (e.relatedTarget === null) setIsPageDragging(false);
+    };
+    const onDrop = (e) => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      setIsPageDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.pdf')) {
+        setInputMode('pdf');
+        setPendingIngest({ mode: 'pdf', file });
+      } else if (name.endsWith('.md') || name.endsWith('.markdown')) {
+        setInputMode('markdown');
+        setPendingIngest({ mode: 'markdown', file });
+      } else {
+        setSnackbarMessage('Unsupported file type. Drop a .pdf or .md file.');
+        setSnackbarOpen(true);
+      }
+    };
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, [setInputMode]);
+
+  // Hand the pending file to the matching uploader once it's mounted.
+  useEffect(() => {
+    if (!pendingIngest) return;
+    if (pendingIngest.mode === 'pdf' && inputMode === 'pdf' && pdfUploaderRef.current?.ingestFile) {
+      pdfUploaderRef.current.ingestFile(pendingIngest.file);
+      setPendingIngest(null);
+    } else if (pendingIngest.mode === 'markdown' && inputMode === 'markdown' && markdownUploaderRef.current?.ingestFile) {
+      markdownUploaderRef.current.ingestFile(pendingIngest.file);
+      setPendingIngest(null);
+    }
+  }, [pendingIngest, inputMode]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -590,17 +697,22 @@ const App = () => {
             </Box>
           ) : inputMode === 'pdf' ? (
             <PdfUploader
+              ref={pdfUploaderRef}
               onTextExtracted={handlePdfTextExtracted}
               onError={handlePdfError}
               theme={theme}
             />
           ) : (
             <MarkdownUploader
+              ref={markdownUploaderRef}
               onTextExtracted={handleMarkdownTextExtracted}
               theme={theme}
             />
           )}
-          <Box display="flex" justifyContent="center" mb={6} mt={2}>
+          <Box display="flex" justifyContent="center" alignItems="center" gap={2} flexWrap="wrap" mb={6} mt={2}>
+            <Typography variant="caption" color="textSecondary">
+              {stats.words.toLocaleString()} words · {stats.chars.toLocaleString()} chars · {stats.lines.toLocaleString()} lines
+            </Typography>
             <Button
               variant="contained"
               color="secondary"
@@ -609,6 +721,18 @@ const App = () => {
             >
               Clear Text
             </Button>
+            {(inputMode === 'pdf' || inputMode === 'markdown') &&
+              (inputMode === 'pdf' ? !!inputText : !!originalMarkdownText) && (
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleDownloadAll}
+                startIcon={isBatchDownloading ? <CircularProgress size={16} /> : <DownloadAllIcon />}
+                disabled={isGenerating || isBatchDownloading}
+              >
+                Download all variants
+              </Button>
+            )}
           </Box>
 
           <Grid container spacing={2} mb={5}>
@@ -624,28 +748,7 @@ const App = () => {
                         {getUnicodeCode(value)}
                       </Typography>
                     </Box>
-                    {inputMode === 'plain' ? (
-                      <TextField
-                        variant="outlined"
-                        fullWidth
-                        multiline
-                        minRows={1}
-                        maxRows={10}
-                        value={replaceSpaces(inputText, value)}
-                        InputProps={{
-                          readOnly: true,
-                        }}
-                        sx={{
-                          mb: 1,
-                          '& .MuiOutlinedInput-root': {
-                            backgroundColor: theme.palette.background.paper,
-                            '& fieldset': {
-                              borderColor: 'rgba(0, 0, 0, 0.12)',
-                            },
-                          },
-                        }}
-                      />
-                    ) : (
+                    {inputMode === 'rich' ? (
                       <Box
                         className="quill-output"
                         sx={{
@@ -667,7 +770,28 @@ const App = () => {
                           '& h3': { fontSize: '1.17em', margin: '0.5em 0' }
                         }}
                         dangerouslySetInnerHTML={{
-                          __html: replaceSpacesInHtml(richText, value)
+                          __html: transformedHtml[key] || ''
+                        }}
+                      />
+                    ) : (
+                      <TextField
+                        variant="outlined"
+                        fullWidth
+                        multiline
+                        minRows={1}
+                        maxRows={10}
+                        value={transformedTexts[key] || ''}
+                        InputProps={{
+                          readOnly: true,
+                        }}
+                        sx={{
+                          mb: 1,
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: theme.palette.background.paper,
+                            '& fieldset': {
+                              borderColor: 'rgba(0, 0, 0, 0.12)',
+                            },
+                          },
                         }}
                       />
                     )}
@@ -680,7 +804,7 @@ const App = () => {
                         size="small"
                         color="primary"
                         onClick={() => handleCopyText(
-                          inputMode === 'rich' ? replaceSpacesInHtml(richText, value) : replaceSpaces(inputText, value),
+                          inputMode === 'rich' ? (transformedHtml[key] || '') : (transformedTexts[key] || ''),
                           key,
                           inputMode === 'rich'
                         )}
@@ -768,20 +892,7 @@ const App = () => {
                   />
                 ))}
               </Box>
-              {inputMode === 'plain' ? (
-                <TextField
-                  variant="outlined"
-                  fullWidth
-                  multiline
-                  minRows={10}
-                  maxRows={12}
-                  value={getCustomSpacingText()}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  sx={{ mb: 2 }}
-                />
-              ) : (
+              {inputMode === 'rich' ? (
                 <Box
                   className="quill-output"
                   sx={{
@@ -803,8 +914,21 @@ const App = () => {
                     '& h3': { fontSize: '1.17em', margin: '0.5em 0' }
                   }}
                   dangerouslySetInnerHTML={{
-                    __html: getCustomSpacingHtml()
+                    __html: customSpacingHtml
                   }}
+                />
+              ) : (
+                <TextField
+                  variant="outlined"
+                  fullWidth
+                  multiline
+                  minRows={10}
+                  maxRows={12}
+                  value={customSpacingText}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  sx={{ mb: 2 }}
                 />
               )}
               <Box display="flex" justifyContent="flex-end" gap={0.5}>
@@ -812,7 +936,7 @@ const App = () => {
                   <IconButton
                     color="primary"
                     onClick={() => handleCopyText(
-                      inputMode === 'rich' ? getCustomSpacingHtml() : getCustomSpacingText(),
+                      inputMode === 'rich' ? customSpacingHtml : customSpacingText,
                       'Custom',
                       inputMode === 'rich'
                     )}
@@ -825,10 +949,7 @@ const App = () => {
                     <span>
                       <IconButton
                         color="secondary"
-                        onClick={() => {
-                          const customSpacing = customSpaces.map(space => unicodeSpaces[space]).join('');
-                          handleDownloadPdf(customSpacing, 'Custom');
-                        }}
+                        onClick={() => handleDownloadPdf(customSpacingChars, 'Custom')}
                         disabled={isGenerating || customSpaces.length === 0}
                       >
                         {isGenerating ? (
@@ -845,10 +966,7 @@ const App = () => {
                     <span>
                       <IconButton
                         color="secondary"
-                        onClick={() => {
-                          const customSpacing = customSpaces.map(space => unicodeSpaces[space]).join('');
-                          handleDownloadMarkdown(customSpacing, 'Custom');
-                        }}
+                        onClick={() => handleDownloadMarkdown(customSpacingChars, 'Custom')}
                         disabled={isGenerating || customSpaces.length === 0}
                       >
                         {isGenerating ? (
@@ -865,6 +983,35 @@ const App = () => {
           </Card>
         </Box>
       </Container>
+      <Box
+        component="footer"
+        sx={{
+          mt: 4, py: 3, px: 2,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={1}>
+          <LockIcon fontSize="small" color="success" />
+          <Typography variant="body2" color="textSecondary">
+            All processing happens in your browser. Your files never leave your device.
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="textSecondary">
+          Source on{' '}
+          <Link href="https://github.com/oct4pie/zero-zerogpt" target="_blank" rel="noopener noreferrer">
+            GitHub
+          </Link>.
+        </Typography>
+      </Box>
+      <Backdrop
+        open={isPageDragging}
+        sx={{ zIndex: (t) => t.zIndex.modal + 1, color: '#fff', flexDirection: 'column', gap: 2 }}
+      >
+        <CloudUploadIcon sx={{ fontSize: 96 }} />
+        <Typography variant="h5">Drop a .pdf or .md file to ingest</Typography>
+      </Backdrop>
       <Snackbar
         anchorOrigin={{
           vertical: 'bottom',
