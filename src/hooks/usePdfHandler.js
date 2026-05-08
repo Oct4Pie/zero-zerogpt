@@ -12,9 +12,7 @@ import { extractAndMergeColors } from '../utils/colorExtractor';
 
 // Use the worker copied to public/ at build time (see scripts/copy-pdf-worker.js)
 // so the app doesn't depend on a third-party CDN at runtime.
-const WORKER_BASENAME = 'pdf.worker.min.mjs';
-const WORKER_PUBLIC_PATH = `${process.env.PUBLIC_URL || ''}/${WORKER_BASENAME}`;
-pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_PUBLIC_PATH;
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ''}/pdf.worker.mjs`;
 
 // Maximum file size allowed (25MB)
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
